@@ -1,5 +1,7 @@
+const { waitUntil } = require('@vercel/functions');
 const { requireAuth } = require('../../lib/auth');
 const { updateShoot, deleteShoot } = require('../../lib/supabase');
+const dropbox = require('../../lib/dropbox');
 
 module.exports = requireAuth(async (req, res) => {
   const { id } = req.query;
@@ -19,6 +21,13 @@ module.exports = requireAuth(async (req, res) => {
     if (!removed) {
       res.status(404).json({ error: 'Not found' });
       return;
+    }
+    // Dropbox folder cleanup runs after the response — deleting the shoot
+    // and its Supabase records shouldn't wait on an extra network round trip.
+    if (dropbox.isConfigured() && removed.dropboxFolderPath) {
+      waitUntil(dropbox.deleteFolder(removed.dropboxFolderPath).catch((err) => {
+        console.error('Dropbox folder cleanup failed:', err.message);
+      }));
     }
     res.status(204).end();
     return;

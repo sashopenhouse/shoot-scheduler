@@ -151,6 +151,24 @@
   .status-msg.error { color: var(--danger); }
 
   a { color: var(--action-red); }
+
+  .photos-section { margin-top: 10px; border-top: 1px solid var(--border); padding-top: 10px; }
+  .photos-toggle { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.82rem; color: var(--muted); font-weight: 600; user-select: none; }
+  .photos-toggle .chev { transition: transform 0.15s ease; display: inline-block; }
+  .photos-toggle.open .chev { transform: rotate(90deg); }
+  .photos-body { display: none; margin-top: 10px; }
+  .photos-body.open { display: block; }
+  .dropbox-link { font-size: 0.8rem; margin-bottom: 8px; }
+  .photo-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+  .photo-thumb { width: 72px; height: 72px; object-fit: cover; border: 1px solid var(--border); background: var(--light-gray); }
+  .photo-upload-row { display: flex; align-items: center; gap: 10px; }
+  .photo-upload-row input[type="file"] { font-size: 0.8rem; }
+
+  .search-panel { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+  .search-panel input { min-width: 160px; }
+  .search-results { display: flex; flex-direction: column; gap: 8px; }
+  .search-result { border: 1px solid var(--border); padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 0.88rem; }
+  .search-result .meta { color: var(--muted); font-size: 0.78rem; }
 </style>
 </head>
 <body>
@@ -225,6 +243,19 @@
     </div>
     <div id="import-status" class="status-msg"></div>
     <div id="import-list" class="import-list"></div>
+  </section>
+
+  <section class="card">
+    <h2>Search photos</h2>
+    <div class="search-panel">
+      <input type="text" id="search-q" placeholder="Search location or notes..." style="flex: 2;" />
+      <input type="date" id="search-from" title="From date" />
+      <input type="date" id="search-to" title="To date" />
+      <button type="button" id="search-btn">Search</button>
+      <button type="button" class="ghost" id="search-clear">Clear</button>
+    </div>
+    <div id="search-status" class="status-msg"></div>
+    <div class="search-results" id="search-results"></div>
   </section>
 
   <section class="card">

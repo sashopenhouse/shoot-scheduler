@@ -30,6 +30,16 @@ async function api(path, opts) {
   return res.status === 204 ? null : res.json();
 }
 
+/** Like api(), but for multipart/form-data (file uploads) — no JSON content-type header. */
+async function apiUpload(path, formData) {
+  const res = await fetch(path, { method: 'POST', body: formData });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error || `Request failed: ${res.status}`);
+  }
+  return res.json();
+}
+
 async function loadShoots() {
   state.shoots = await api('/api/shoots');
   render();
@@ -75,6 +85,20 @@ function render() {
                 .join(' &middot; ')}</div>`
             : ''
         }
+        <div class="photos-section">
+          <div class="photos-toggle" data-action="toggle-photos">
+            <span class="chev">&#9656;</span> Photos
+          </div>
+          <div class="photos-body" data-role="photos-body">
+            <div class="status-msg" data-role="photos-status"></div>
+            <div class="dropbox-link" data-role="dropbox-link"></div>
+            <div class="photo-grid" data-role="photo-grid"></div>
+            <div class="photo-upload-row">
+              <input type="file" accept="image/*" multiple data-role="photo-input" />
+              <button type="button" class="ghost" data-action="upload-photos">Upload</button>
+            </div>
+          </div>
+        </div>
       </div>
       <div class="actions">
         <button type="button" class="ghost" data-action="edit">Edit</button>
@@ -119,8 +143,80 @@ function render() {
       }
     });
 
+    wirePhotosSection(wrap, s);
+
     listEl.appendChild(wrap);
   }
+}
+
+function renderPhotoGrid(gridEl, photos) {
+  gridEl.innerHTML = photos
+    .map((p) => {
+      const href = p.dropboxShareUrl || '#';
+      return `<a href="${href}" target="_blank" rel="noopener" title="${escapeHtml(p.filename)}">
+        <div class="photo-thumb" style="display:flex;align-items:center;justify-content:center;font-size:0.65rem;color:var(--muted);text-align:center;padding:4px;overflow:hidden;">${escapeHtml(p.filename)}</div>
+      </a>`;
+    })
+    .join('');
+}
+
+function wirePhotosSection(wrap, shoot) {
+  const toggle = wrap.querySelector('[data-action="toggle-photos"]');
+  const body = wrap.querySelector('[data-role="photos-body"]');
+  const statusEl = wrap.querySelector('[data-role="photos-status"]');
+  const dropboxLinkEl = wrap.querySelector('[data-role="dropbox-link"]');
+  const gridEl = wrap.querySelector('[data-role="photo-grid"]');
+  const fileInput = wrap.querySelector('[data-role="photo-input"]');
+  const uploadBtn = wrap.querySelector('[data-action="upload-photos"]');
+
+  let loaded = false;
+
+  async function loadPhotos() {
+    statusEl.textContent = 'Loading photos...';
+    try {
+      const photos = await api(`/api/shoots/${shoot.id}/photos`);
+      statusEl.textContent = photos.length ? '' : 'No photos yet.';
+      renderPhotoGrid(gridEl, photos);
+      if (shoot.dropboxShareUrl) {
+        dropboxLinkEl.innerHTML = `<a href="${shoot.dropboxShareUrl}" target="_blank" rel="noopener">Open Dropbox folder</a>`;
+      }
+      loaded = true;
+    } catch (err) {
+      statusEl.textContent = err.message;
+      statusEl.className = 'status-msg error';
+    }
+  }
+
+  toggle.addEventListener('click', () => {
+    const isOpen = body.classList.toggle('open');
+    toggle.classList.toggle('open', isOpen);
+    if (isOpen && !loaded) loadPhotos();
+  });
+
+  uploadBtn.addEventListener('click', async () => {
+    if (!fileInput.files.length) return;
+    uploadBtn.disabled = true;
+    uploadBtn.textContent = 'Uploading...';
+    statusEl.textContent = '';
+    statusEl.className = 'status-msg';
+    try {
+      const formData = new FormData();
+      for (const file of fileInput.files) formData.append('photos', file);
+      const result = await apiUpload(`/api/shoots/${shoot.id}/photos`, formData);
+      if (result.dropboxFolderShareUrl) {
+        shoot.dropboxShareUrl = result.dropboxFolderShareUrl;
+        dropboxLinkEl.innerHTML = `<a href="${shoot.dropboxShareUrl}" target="_blank" rel="noopener">Open Dropbox folder</a>`;
+      }
+      fileInput.value = '';
+      await loadPhotos();
+    } catch (err) {
+      statusEl.textContent = err.message;
+      statusEl.className = 'status-msg error';
+    } finally {
+      uploadBtn.disabled = false;
+      uploadBtn.textContent = 'Upload';
+    }
+  });
 }
 
 function jobProgressHtml(progress, { showRefresh = true } = {}) {
@@ -265,4 +361,57 @@ importList.addEventListener('click', async (ev) => {
 
 loadShoots().catch((err) => {
   listEl.innerHTML = `<div class="empty">Failed to load shoot days: ${escapeHtml(err.message)}</div>`;
+});
+
+// --- Photo search ---
+const searchStatus = el('search-status');
+const searchResults = el('search-results');
+
+async function runSearch() {
+  const q = el('search-q').value.trim();
+  const dateFrom = el('search-from').value;
+  const dateTo = el('search-to').value;
+
+  searchStatus.textContent = 'Searching...';
+  searchStatus.className = 'status-msg';
+  searchResults.innerHTML = '';
+
+  try {
+    const params = new URLSearchParams();
+    if (q) params.set('q', q);
+    if (dateFrom) params.set('dateFrom', dateFrom);
+    if (dateTo) params.set('dateTo', dateTo);
+    const results = await api(`/api/shoots/search?${params.toString()}`);
+
+    if (!results.length) {
+      searchStatus.textContent = 'No shoots match.';
+      return;
+    }
+    searchStatus.textContent = `${results.length} shoot(s) found.`;
+    for (const s of results) {
+      const row = document.createElement('div');
+      row.className = 'search-result';
+      row.innerHTML = `
+        <div>
+          <div><strong>${escapeHtml(s.location || 'Untitled site')}</strong></div>
+          <div class="meta">${fmtDate(s.date)} &middot; ${s.photoCount} photo${s.photoCount === 1 ? '' : 's'}</div>
+        </div>
+        ${s.dropboxShareUrl ? `<a href="${s.dropboxShareUrl}" target="_blank" rel="noopener">Open Dropbox folder</a>` : ''}
+      `;
+      searchResults.appendChild(row);
+    }
+  } catch (err) {
+    searchStatus.textContent = err.message;
+    searchStatus.className = 'status-msg error';
+  }
+}
+
+el('search-btn').addEventListener('click', runSearch);
+el('search-q').addEventListener('keydown', (e) => { if (e.key === 'Enter') runSearch(); });
+el('search-clear').addEventListener('click', () => {
+  el('search-q').value = '';
+  el('search-from').value = '';
+  el('search-to').value = '';
+  searchStatus.textContent = '';
+  searchResults.innerHTML = '';
 });
