@@ -1,3 +1,4 @@
+const { waitUntil } = require('@vercel/functions');
 const { requireAuth } = require('../../../../lib/auth');
 const connecteam = require('../../../../lib/connecteam');
 const { createShoot } = require('../../../../lib/supabase');
@@ -16,7 +17,11 @@ module.exports = requireAuth(async (req, res) => {
     const { shiftId } = req.query;
     const days = Number(req.query.days || 30);
     const now = Math.floor(Date.now() / 1000);
-    const shifts = await connecteam.listShifts(now - 86400, now + days * 86400);
+    // Anchored to the start of today, not "now minus 24h" — see the shifts
+    // list route for why a rolling offset makes today's jobs disappear.
+    const todayStart = Math.floor(now / 86400) * 86400;
+    const { shifts, refresh: refreshShifts } = await connecteam.fetchShiftsCached(todayStart, now + days * 86400);
+    if (refreshShifts) waitUntil(refreshShifts());
     const collapsed = connecteam.collapseToOnePerJob(shifts, now);
     const shift = collapsed.find((s) => String(s.shiftId) === String(shiftId));
     if (!shift) {
@@ -39,7 +44,10 @@ module.exports = requireAuth(async (req, res) => {
     if (shift.crew?.length) noteParts.push(`Crew: ${shift.crew.join(', ')}`);
     if (shift.details) noteParts.push(shift.details);
 
-    const progress = await connecteam.getJobProgress(shift.title).catch(() => null);
+    const { progress, refresh: refreshProgress } = await connecteam
+      .getJobProgress(shift.title)
+      .catch(() => ({ progress: null, refresh: null }));
+    if (refreshProgress) waitUntil(refreshProgress());
 
     const shoot = await createShoot({
       location: shift.location.address || shift.title || 'Untitled site',

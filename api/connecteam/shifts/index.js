@@ -1,3 +1,4 @@
+const { waitUntil } = require('@vercel/functions');
 const { requireAuth } = require('../../../lib/auth');
 const connecteam = require('../../../lib/connecteam');
 
@@ -14,17 +15,29 @@ module.exports = requireAuth(async (req, res) => {
   try {
     const days = Number(req.query.days || 30);
     const now = Math.floor(Date.now() / 1000);
-    const startTime = now - 86400; // include anything from yesterday on
+    // Anchored to the start of today (not "now minus 24h") so a job
+    // scheduled for earlier today never rolls out of the window just
+    // because the clock has moved past its shift time.
+    const todayStart = Math.floor(now / 86400) * 86400;
+    const startTime = todayStart;
     const endTime = now + days * 86400;
-    const shifts = await connecteam.listShifts(startTime, endTime);
+
+    // Stale-while-revalidate: serve cached shifts immediately (even if
+    // stale) so this route doesn't block on a slow Connecteam page-through;
+    // any needed refresh runs after the response via waitUntil.
+    const { shifts, refresh: refreshShifts } = await connecteam.fetchShiftsCached(startTime, endTime);
+    if (refreshShifts) waitUntil(refreshShifts());
+
     const filtered = shifts.filter((s) => !connecteam.NON_JOB_TITLE.test(s.title || ''));
     const collapsed = connecteam
       .collapseToOnePerJob(filtered, now)
       .sort((a, b) => (a.startTime ?? Infinity) - (b.startTime ?? Infinity));
 
-    const progressByTitle = await connecteam
+    const { progressByTitle, refresh: refreshProgress } = await connecteam
       .getJobProgressBulk(collapsed.map((s) => s.title))
-      .catch(() => new Map());
+      .catch(() => ({ progressByTitle: new Map(), refresh: null }));
+    if (refreshProgress) waitUntil(refreshProgress());
+
     const withProgress = collapsed.map((s) => ({
       ...s,
       progress: progressByTitle.get((s.title || '').trim().toLowerCase()) || null,

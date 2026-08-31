@@ -24,7 +24,14 @@ module.exports = requireAuth(async (req, res) => {
   }
 
   try {
-    const progress = await connecteam.getJobProgress(shoot.connecteamShiftTitle);
+    // This route is the explicit "check now" action, so if the underlying
+    // cache is stale it waits for a real refresh before answering, rather
+    // than serving stale data the way the passive list views do.
+    let { progress, refresh } = await connecteam.getJobProgress(shoot.connecteamShiftTitle);
+    if (refresh) {
+      await refresh();
+      ({ progress } = await connecteam.getJobProgress(shoot.connecteamShiftTitle));
+    }
     const updated = await updateShoot(id, { connecteamProgress: progress });
     res.json(updated);
   } catch (err) {
