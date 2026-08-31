@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Shoot Scheduler</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    /* New York Sash brand palette */
+    --brand-red: #B20022;
+    --action-red: #DC3545;
+    --black: #000000;
+    --white: #FFFFFF;
+    --slate: #64788C;
+    --light-gray: #F8F8F8;
+
+    --bg: var(--light-gray);
+    --panel: var(--white);
+    --border: #e2e5e9;
+    --text: var(--black);
+    --muted: var(--slate);
+    --accent: var(--action-red);
+    --accent-ink: var(--white);
+    --planned: var(--slate);
+    --confirmed: var(--brand-red);
+    --completed: var(--black);
+    --danger: var(--action-red);
+    font-family: "Aptos", "Inter", -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font-weight: 300; }
+  h1, h2, h3, strong { font-weight: 900; }
+  header {
+    padding: 26px 28px 22px;
+    background: linear-gradient(135deg, var(--black), #1a1a1a 60%, var(--brand-red));
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  header .eyebrow { color: var(--white); opacity: 0.7; font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em; margin: 0 0 4px; }
+  header h1 { font-size: 1.5rem; margin: 0; letter-spacing: -0.01em; color: var(--white); font-weight: 900; }
+  header p { margin: 4px 0 0; color: var(--white); opacity: 0.75; font-size: 0.85rem; font-weight: 300; }
+  main {
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 24px 20px 80px;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 22px;
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 0;
+    padding: 18px 20px;
+  }
+  .card h2 { font-size: 0.85rem; margin: 0 0 12px; color: var(--brand-red); text-transform: uppercase; letter-spacing: 0.08em; font-weight: 700; }
+  .row { display: flex; gap: 12px; flex-wrap: wrap; }
+  .field { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 140px; }
+  .field label { font-size: 0.78rem; color: var(--muted); }
+  input, select, textarea {
+    font: inherit;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 0;
+    background: var(--white);
+    color: var(--text);
+  }
+  textarea { resize: vertical; min-height: 44px; }
+  button {
+    font: inherit;
+    cursor: pointer;
+    border: none;
+    border-radius: 0;
+    padding: 9px 16px;
+    background: var(--action-red);
+    color: var(--accent-ink);
+    font-weight: 700;
+  }
+  button:hover { background: var(--brand-red); }
+  button.secondary { background: transparent; color: var(--brand-red); border: 1px solid var(--brand-red); }
+  button.secondary:hover { background: var(--brand-red); color: var(--white); }
+  button.ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); font-weight: 500; padding: 6px 10px; }
+  button.ghost:hover { background: var(--light-gray); color: var(--text); }
+  button.danger { background: transparent; color: var(--danger); border: 1px solid var(--danger); padding: 6px 10px; font-weight: 500; }
+  button.danger:hover { background: var(--action-red); color: var(--white); }
+  .form-actions { margin-top: 14px; display: flex; gap: 10px; }
+
+  .toolbar { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 4px; }
+  .filters { display: flex; gap: 8px; }
+  .filters button { background: transparent; color: var(--muted); border: 1px solid var(--border); font-weight: 500; padding: 6px 12px; }
+  .filters button.active { background: var(--black); color: #fff; border-color: var(--black); }
+
+  .shoot-list { display: flex; flex-direction: column; gap: 10px; }
+  .shoot {
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--brand-red);
+    border-radius: 0;
+    padding: 14px 16px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 10px;
+    align-items: start;
+    background: var(--white);
+  }
+  .shoot .main { display: flex; flex-direction: column; gap: 4px; }
+  .shoot .loc { font-weight: 700; }
+  .shoot .when { color: var(--muted); font-size: 0.88rem; }
+  .badge {
+    display: inline-block;
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    padding: 3px 9px;
+    border-radius: 0;
+    border: none;
+    color: #fff;
+    width: fit-content;
+    cursor: pointer;
+  }
+  .badge.planned { background: var(--planned); }
+  .badge.confirmed { background: var(--confirmed); }
+  .badge.completed { background: var(--completed); }
+
+  .checklist { display: flex; gap: 14px; margin-top: 6px; }
+  .checklist label { display: flex; align-items: center; gap: 5px; font-size: 0.82rem; color: var(--muted); cursor: pointer; }
+  .checklist input { width: auto; }
+  .checklist label.done { color: var(--brand-red); font-weight: 600; }
+
+  .shoot .actions { display: flex; flex-direction: column; gap: 6px; align-items: flex-end; }
+  .shoot .notes { font-size: 0.85rem; color: var(--muted); margin-top: 4px; white-space: pre-wrap; }
+
+  .job-progress { margin-top: 8px; }
+  .job-progress .label { display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--muted); margin-bottom: 3px; }
+  .job-progress .track { height: 7px; border-radius: 0; background: var(--border); overflow: hidden; }
+  .job-progress .fill { height: 100%; background: var(--brand-red); border-radius: 0; transition: width 0.2s ease; }
+  .job-progress .refresh { border: none; background: none; color: var(--action-red); font-size: 0.72rem; cursor: pointer; padding: 0; font-weight: 600; }
+
+  .empty { color: var(--muted); font-size: 0.9rem; padding: 20px 0; text-align: center; }
+
+  .import-list { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; max-height: 300px; overflow-y: auto; }
+  .import-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; border: 1px solid var(--border); border-radius: 0; padding: 8px 12px; font-size: 0.85rem; }
+  .import-row .meta { color: var(--muted); font-size: 0.78rem; }
+  .status-msg { font-size: 0.85rem; color: var(--muted); margin-top: 8px; }
+  .status-msg.error { color: var(--danger); }
+
+  a { color: var(--action-red); }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <p class="eyebrow">New York Sash</p>
+    <h1>Shoot Scheduler</h1>
+    <p>Plan photography shoot days &mdash; location, time, and Before / During / After coverage.</p>
+  </div>
+</header>
+
+<main>
+  <section class="card">
+    <h2 id="form-title">New shoot day</h2>
+    <form id="shoot-form">
+      <input type="hidden" id="shoot-id" />
+      <div class="row">
+        <div class="field" style="flex: 2;">
+          <label for="f-location">Location / jobsite</label>
+          <input id="f-location" required placeholder="123 Main St, Anytown" />
+        </div>
+        <div class="field">
+          <label for="f-status">Status</label>
+          <select id="f-status">
+            <option value="planned">Planned</option>
+            <option value="confirmed">Confirmed</option>
+            <option value="completed">Completed</option>
+          </select>
+        </div>
+      </div>
+      <div class="row">
+        <div class="field">
+          <label for="f-date">Date</label>
+          <input id="f-date" type="date" required />
+        </div>
+        <div class="field">
+          <label for="f-start">Start time</label>
+          <input id="f-start" type="time" />
+        </div>
+        <div class="field">
+          <label for="f-end">End time</label>
+          <input id="f-end" type="time" />
+        </div>
+      </div>
+      <div class="row">
+        <div class="field" style="flex: 1;">
+          <label>Shot checklist</label>
+          <div class="checklist">
+            <label><input type="checkbox" id="f-before" /> Before</label>
+            <label><input type="checkbox" id="f-during" /> During</label>
+            <label><input type="checkbox" id="f-after" /> After</label>
+          </div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="field">
+          <label for="f-notes">Notes</label>
+          <textarea id="f-notes" placeholder="Contact info, gate code, crew, shot list..."></textarea>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button type="submit" id="submit-btn">Add shoot day</button>
+        <button type="button" class="secondary" id="cancel-edit" style="display:none;">Cancel edit</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="card">
+    <div class="toolbar">
+      <h2 style="margin:0;">Connecteam import</h2>
+      <button type="button" class="ghost" id="load-shifts">Load upcoming installs</button>
+    </div>
+    <div id="import-status" class="status-msg"></div>
+    <div id="import-list" class="import-list"></div>
+  </section>
+
+  <section class="card">
+    <div class="toolbar">
+      <h2 style="margin:0;">Shoot days</h2>
+      <div class="filters" id="filters">
+        <button data-filter="all" class="active">All</button>
+        <button data-filter="planned">Planned</button>
+        <button data-filter="confirmed">Confirmed</button>
+        <button data-filter="completed">Completed</button>
+      </div>
+    </div>
+    <div class="shoot-list" id="shoot-list"></div>
+  </section>
+</main>
+
+<script src="app.js"></script>
+</body>
+</html>
