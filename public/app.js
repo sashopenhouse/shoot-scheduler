@@ -442,9 +442,22 @@ async function initMap() {
     });
     map.addControl(new mapboxgl.NavigationControl(), 'top-right');
 
-    // Geocode any shoots missing coordinates, then draw pins once ready.
-    await api('/api/shoots/geocode', { method: 'POST' }).catch(() => {});
-    map.on('load', () => updateMap(state.shoots));
+    const mapReady = new Promise((resolve) => map.on('load', resolve));
+
+    // Geocode any shoots missing coordinates, then refresh state.shoots so
+    // the newly-geocoded lat/lng actually make it into the pins — the
+    // earlier loadShoots() call runs before geocoding finishes and would
+    // otherwise leave state.shoots stuck without coordinates. Race this
+    // against the map's own load event so pins draw as soon as both are
+    // ready, regardless of which finishes first.
+    await Promise.all([
+      mapReady,
+      api('/api/shoots/geocode', { method: 'POST' })
+        .then(() => api('/api/shoots'))
+        .then((shoots) => { state.shoots = shoots; })
+        .catch(() => {}),
+    ]);
+    updateMap(state.shoots);
   } catch (err) {
     mapStatus.textContent = `Map failed to load: ${err.message}`;
     mapStatus.className = 'status-msg error';
