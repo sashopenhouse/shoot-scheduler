@@ -5,13 +5,12 @@
   "description": "Personal scheduler for planning photography shoot days at jobsites, with Before/During/After shot tracking.",
   "type": "commonjs",
   "scripts": {
-    "dev": "vercel dev"
+    "dev": "npx vercel dev"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.112.4"
   },
   "devDependencies": {
-    "dotenv": "^17.4.2",
-    "vercel": "^37.14.0"
+    "dotenv": "^17.4.2"
   }
 }
