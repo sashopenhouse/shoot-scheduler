@@ -43,6 +43,7 @@ async function apiUpload(path, formData) {
 async function loadShoots() {
   state.shoots = await api('/api/shoots');
   render();
+  updateMap(state.shoots);
 }
 
 function sortedFilteredShoots() {
@@ -61,6 +62,7 @@ function render() {
   for (const s of shoots) {
     const wrap = document.createElement('div');
     wrap.className = 'shoot';
+    wrap.id = `shoot-card-${s.id}`;
 
     const phases = ['before', 'during', 'after'];
     const checklistHtml = phases
@@ -302,7 +304,7 @@ filtersEl.addEventListener('click', (e) => {
 const importStatus = el('import-status');
 const importList = el('import-list');
 
-el('load-shifts').addEventListener('click', async () => {
+async function loadConnecteamShifts() {
   importStatus.textContent = 'Loading...';
   importStatus.className = 'status-msg';
   importList.innerHTML = '';
@@ -339,7 +341,10 @@ el('load-shifts').addEventListener('click', async () => {
     importStatus.textContent = err.message;
     importStatus.className = 'status-msg error';
   }
-});
+}
+
+el('load-shifts').addEventListener('click', loadConnecteamShifts);
+loadConnecteamShifts();
 
 importList.addEventListener('click', async (ev) => {
   const btn = ev.target.closest('button[data-action="schedule"]');
@@ -415,3 +420,79 @@ el('search-clear').addEventListener('click', () => {
   searchStatus.textContent = '';
   searchResults.innerHTML = '';
 });
+
+// --- Map ---
+const mapStatus = el('map-status');
+let map = null;
+let mapMarkers = [];
+
+async function initMap() {
+  try {
+    const config = await api('/api/config');
+    if (!config.mapboxToken) {
+      mapStatus.textContent = 'Map disabled: MAPBOX_TOKEN is not set on the server.';
+      return;
+    }
+    mapboxgl.accessToken = config.mapboxToken;
+    map = new mapboxgl.Map({
+      container: 'shoot-map',
+      style: 'mapbox://styles/mapbox/light-v11',
+      center: [-75.4, 43.1], // Central New York, as a sane default before any pins load
+      zoom: 7,
+    });
+    map.addControl(new mapboxgl.NavigationControl(), 'top-right');
+
+    // Geocode any shoots missing coordinates, then draw pins once ready.
+    await api('/api/shoots/geocode', { method: 'POST' }).catch(() => {});
+    map.on('load', () => updateMap(state.shoots));
+  } catch (err) {
+    mapStatus.textContent = `Map failed to load: ${err.message}`;
+    mapStatus.className = 'status-msg error';
+  }
+}
+
+function updateMap(shoots) {
+  if (!map) return;
+
+  mapMarkers.forEach((m) => m.remove());
+  mapMarkers = [];
+
+  const withCoords = shoots.filter((s) => typeof s.lat === 'number' && typeof s.lng === 'number');
+  if (!withCoords.length) {
+    mapStatus.textContent = shoots.length ? 'No shoot locations geocoded yet.' : '';
+    return;
+  }
+  mapStatus.textContent = '';
+
+  const bounds = new mapboxgl.LngLatBounds();
+  for (const s of withCoords) {
+    const el2 = document.createElement('div');
+    el2.className = `map-pin ${s.status}`;
+
+    const popup = new mapboxgl.Popup({ offset: 18 }).setHTML(
+      `<strong>${escapeHtml(s.location || 'Untitled site')}</strong>${fmtDate(s.date)}`,
+    );
+
+    const marker = new mapboxgl.Marker(el2).setLngLat([s.lng, s.lat]).setPopup(popup).addTo(map);
+    el2.addEventListener('click', () => highlightShootCard(s.id));
+
+    mapMarkers.push(marker);
+    bounds.extend([s.lng, s.lat]);
+  }
+
+  if (withCoords.length === 1) {
+    map.jumpTo({ center: [withCoords[0].lng, withCoords[0].lat], zoom: 12 });
+  } else {
+    map.fitBounds(bounds, { padding: 50, maxZoom: 13 });
+  }
+}
+
+function highlightShootCard(shootId) {
+  const card = el(`shoot-card-${shootId}`);
+  if (!card) return;
+  card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  card.classList.add('highlighted');
+  setTimeout(() => card.classList.remove('highlighted'), 2000);
+}
+
+initMap();

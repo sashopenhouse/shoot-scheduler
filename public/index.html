@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&display=swap" rel="stylesheet">
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.6.0/mapbox-gl.css" rel="stylesheet">
 <style>
   :root {
     /* New York Sash brand palette */
@@ -169,6 +170,23 @@
   .search-results { display: flex; flex-direction: column; gap: 8px; }
   .search-result { border: 1px solid var(--border); padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 0.88rem; }
   .search-result .meta { color: var(--muted); font-size: 0.78rem; }
+
+  #shoot-map { width: 100%; height: 340px; border: 1px solid var(--border); }
+  .map-pin {
+    width: 22px;
+    height: 22px;
+    background: var(--brand-red);
+    border: 2px solid var(--white);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+    cursor: pointer;
+    transform: rotate(45deg);
+    border-radius: 0 50% 50% 50%;
+  }
+  .map-pin.completed { background: var(--completed); }
+  .map-pin.confirmed { background: var(--confirmed); }
+  .mapboxgl-popup-content { font-family: inherit; font-size: 0.85rem; padding: 10px 12px; border-radius: 0; }
+  .mapboxgl-popup-content strong { display: block; margin-bottom: 3px; }
+  .shoot.highlighted { outline: 2px solid var(--brand-red); outline-offset: 2px; }
 </style>
 </head>
 <body>
@@ -239,7 +257,7 @@
   <section class="card">
     <div class="toolbar">
       <h2 style="margin:0;">Connecteam import</h2>
-      <button type="button" class="ghost" id="load-shifts">Load upcoming installs</button>
+      <button type="button" class="ghost" id="load-shifts">Refresh</button>
     </div>
     <div id="import-status" class="status-msg"></div>
     <div id="import-list" class="import-list"></div>
@@ -259,6 +277,12 @@
   </section>
 
   <section class="card">
+    <h2 style="margin:0 0 12px;">Shoot map</h2>
+    <div id="shoot-map"></div>
+    <div id="map-status" class="status-msg"></div>
+  </section>
+
+  <section class="card">
     <div class="toolbar">
       <h2 style="margin:0;">Shoot days</h2>
       <div class="filters" id="filters">
@@ -272,6 +296,7 @@
   </section>
 </main>
 
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.6.0/mapbox-gl.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
