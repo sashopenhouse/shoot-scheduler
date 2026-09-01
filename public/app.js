@@ -1,4 +1,4 @@
-const state = { shoots: [], filter: 'all' };
+const state = { shoots: [], filter: 'all', importShifts: [] };
 
 const el = (id) => document.getElementById(id);
 const form = el('shoot-form');
@@ -43,7 +43,7 @@ async function apiUpload(path, formData) {
 async function loadShoots() {
   state.shoots = await api('/api/shoots');
   render();
-  updateMap(state.shoots);
+  updateMap();
 }
 
 function sortedFilteredShoots() {
@@ -310,6 +310,8 @@ async function loadConnecteamShifts() {
   importList.innerHTML = '';
   try {
     const shifts = await api('/api/connecteam/shifts?days=30');
+    state.importShifts = shifts;
+    updateMap();
     if (!shifts.length) {
       importStatus.textContent = 'No likely job shifts found in the next 30 days.';
       return;
@@ -355,6 +357,7 @@ importList.addEventListener('click', async (ev) => {
   btn.textContent = 'Scheduling...';
   try {
     await api(`/api/connecteam/shifts/${encodeURIComponent(shiftId)}/import?days=30`, { method: 'POST' });
+    state.importShifts = state.importShifts.filter((s) => s.shiftId !== shiftId);
     await loadShoots();
     row.remove();
   } catch (err) {
@@ -457,44 +460,68 @@ async function initMap() {
         .then((shoots) => { state.shoots = shoots; })
         .catch(() => {}),
     ]);
-    updateMap(state.shoots);
+    updateMap();
   } catch (err) {
     mapStatus.textContent = `Map failed to load: ${err.message}`;
     mapStatus.className = 'status-msg error';
   }
 }
 
-function updateMap(shoots) {
+function updateMap() {
   if (!map) return;
 
   mapMarkers.forEach((m) => m.remove());
   mapMarkers = [];
 
-  const withCoords = shoots.filter((s) => typeof s.lat === 'number' && typeof s.lng === 'number');
-  if (!withCoords.length) {
-    mapStatus.textContent = shoots.length ? 'No shoot locations geocoded yet.' : '';
+  const shootPoints = state.shoots
+    .filter((s) => typeof s.lat === 'number' && typeof s.lng === 'number')
+    .map((s) => ({
+      lat: s.lat,
+      lng: s.lng,
+      title: s.location,
+      subtitle: fmtDate(s.date),
+      pinClass: s.status,
+      onClick: () => highlightShootCard(s.id),
+    }));
+
+  // Import candidates aren't saved shoots yet, so they don't have a card to
+  // scroll to — the popup is the only detail available for them.
+  const importPoints = state.importShifts
+    .filter((s) => typeof s.lat === 'number' && typeof s.lng === 'number')
+    .map((s) => ({
+      lat: s.lat,
+      lng: s.lng,
+      title: s.title || s.jobTitle || 'Untitled shift',
+      subtitle: s.startTime ? new Date(s.startTime * 1000).toLocaleDateString() : 'Not yet scheduled',
+      pinClass: 'import-candidate',
+      onClick: null,
+    }));
+
+  const points = [...shootPoints, ...importPoints];
+  if (!points.length) {
+    mapStatus.textContent = state.shoots.length || state.importShifts.length ? 'No locations geocoded yet.' : '';
     return;
   }
   mapStatus.textContent = '';
 
   const bounds = new mapboxgl.LngLatBounds();
-  for (const s of withCoords) {
+  for (const p of points) {
     const el2 = document.createElement('div');
-    el2.className = `map-pin ${s.status}`;
+    el2.className = `map-pin ${p.pinClass}`;
 
     const popup = new mapboxgl.Popup({ offset: 18 }).setHTML(
-      `<strong>${escapeHtml(s.location || 'Untitled site')}</strong>${fmtDate(s.date)}`,
+      `<strong>${escapeHtml(p.title || 'Untitled site')}</strong>${escapeHtml(p.subtitle)}`,
     );
 
-    const marker = new mapboxgl.Marker(el2).setLngLat([s.lng, s.lat]).setPopup(popup).addTo(map);
-    el2.addEventListener('click', () => highlightShootCard(s.id));
+    const marker = new mapboxgl.Marker(el2).setLngLat([p.lng, p.lat]).setPopup(popup).addTo(map);
+    if (p.onClick) el2.addEventListener('click', p.onClick);
 
     mapMarkers.push(marker);
-    bounds.extend([s.lng, s.lat]);
+    bounds.extend([p.lng, p.lat]);
   }
 
-  if (withCoords.length === 1) {
-    map.jumpTo({ center: [withCoords[0].lng, withCoords[0].lat], zoom: 12 });
+  if (points.length === 1) {
+    map.jumpTo({ center: [points[0].lng, points[0].lat], zoom: 12 });
   } else {
     map.fitBounds(bounds, { padding: 50, maxZoom: 13 });
   }

@@ -184,6 +184,8 @@
   }
   .map-pin.completed { background: var(--completed); }
   .map-pin.confirmed { background: var(--confirmed); }
+  .map-pin.import-candidate { background: var(--white); border-color: var(--slate); opacity: 0.85; }
+  .legend-swatch { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 4px; vertical-align: middle; }
   .mapboxgl-popup-content { font-family: inherit; font-size: 0.85rem; padding: 10px 12px; border-radius: 0; }
   .mapboxgl-popup-content strong { display: block; margin-bottom: 3px; }
   .shoot.highlighted { outline: 2px solid var(--brand-red); outline-offset: 2px; }
@@ -279,6 +281,12 @@
   <section class="card">
     <h2 style="margin:0 0 12px;">Shoot map</h2>
     <div id="shoot-map"></div>
+    <div class="status-msg" style="display:flex; gap:16px; margin-top:8px;">
+      <span><span class="legend-swatch" style="background:var(--planned);"></span> Planned</span>
+      <span><span class="legend-swatch" style="background:var(--confirmed);"></span> Confirmed</span>
+      <span><span class="legend-swatch" style="background:var(--completed);"></span> Completed</span>
+      <span><span class="legend-swatch" style="background:var(--white); border:1px solid var(--slate);"></span> Not yet scheduled</span>
+    </div>
     <div id="map-status" class="status-msg"></div>
   </section>
 

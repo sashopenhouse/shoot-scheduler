@@ -1,6 +1,7 @@
 const { waitUntil } = require('@vercel/functions');
 const { requireAuth } = require('../../../lib/auth');
 const connecteam = require('../../../lib/connecteam');
+const mapbox = require('../../../lib/mapbox');
 
 module.exports = requireAuth(async (req, res) => {
   if (req.method !== 'GET') {
@@ -38,10 +39,22 @@ module.exports = requireAuth(async (req, res) => {
       .catch(() => ({ progressByTitle: new Map(), refresh: null }));
     if (refreshProgress) waitUntil(refreshProgress());
 
-    const withProgress = collapsed.map((s) => ({
-      ...s,
-      progress: progressByTitle.get((s.title || '').trim().toLowerCase()) || null,
-    }));
+    let geocodeByAddress = new Map();
+    if (mapbox.isConfigured()) {
+      geocodeByAddress = await mapbox
+        .geocodeManyCached(collapsed.map((s) => s.location?.address).filter(Boolean))
+        .catch(() => new Map());
+    }
+
+    const withProgress = collapsed.map((s) => {
+      const point = s.location?.address ? geocodeByAddress.get(s.location.address) : null;
+      return {
+        ...s,
+        progress: progressByTitle.get((s.title || '').trim().toLowerCase()) || null,
+        lat: point?.lat ?? null,
+        lng: point?.lng ?? null,
+      };
+    });
 
     res.json(withProgress);
   } catch (err) {
