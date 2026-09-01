@@ -242,7 +242,10 @@
         <button data-filter="completed">Completed</button>
       </div>
     </div>
-    <div class="shoot-list" id="shoot-list"></div>
+    <label style="display:flex; align-items:center; gap:6px; font-size:0.82rem; color:var(--muted); margin-top:8px; cursor:pointer; width:fit-content;">
+      <input type="checkbox" id="show-archived" style="width:auto;" /> Show archived (past-dated) shoots
+    </label>
+    <div class="shoot-list" id="shoot-list" style="margin-top:10px;"></div>
   </section>
 
   <section class="card">

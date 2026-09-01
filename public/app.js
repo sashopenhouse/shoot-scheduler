@@ -1,4 +1,18 @@
-const state = { shoots: [], filter: 'all', importShifts: [] };
+const state = { shoots: [], filter: 'all', importShifts: [], showArchived: false };
+
+function todayDateString() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/** A shoot is archived once its date has passed — undated shoots never archive. */
+function isArchived(shoot) {
+  return Boolean(shoot.date) && shoot.date < todayDateString();
+}
+
+function visibleShoots() {
+  return state.showArchived ? state.shoots : state.shoots.filter((s) => !isArchived(s));
+}
 
 const el = (id) => document.getElementById(id);
 const form = el('shoot-form');
@@ -30,16 +44,6 @@ async function api(path, opts) {
   return res.status === 204 ? null : res.json();
 }
 
-/** Like api(), but for multipart/form-data (file uploads) — no JSON content-type header. */
-async function apiUpload(path, formData) {
-  const res = await fetch(path, { method: 'POST', body: formData });
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw new Error(body.error || `Request failed: ${res.status}`);
-  }
-  return res.json();
-}
-
 async function loadShoots() {
   state.shoots = await api('/api/shoots');
   render();
@@ -47,7 +51,7 @@ async function loadShoots() {
 }
 
 function sortedFilteredShoots() {
-  return [...state.shoots]
+  return visibleShoots()
     .filter((s) => state.filter === 'all' || s.status === state.filter)
     .sort((a, b) => (a.date || '9999').localeCompare(b.date || '9999') || (a.startTime || '').localeCompare(b.startTime || ''));
 }
@@ -62,6 +66,7 @@ function render() {
   for (const s of shoots) {
     const wrap = document.createElement('div');
     wrap.className = 'shoot';
+    if (isArchived(s)) wrap.style.opacity = '0.6';
     wrap.id = `shoot-card-${s.id}`;
 
     const phases = ['before', 'during', 'after'];
@@ -77,6 +82,7 @@ function render() {
         <div style="display:flex; gap:6px; flex-wrap:wrap;">
           <button type="button" class="badge ${s.status}" data-action="cycle-status" title="Click to advance status">${s.status}</button>
           ${s.projectType ? `<span class="type-badge">${escapeHtml(projectTypeLabel(s.projectType))}</span>` : ''}
+          ${isArchived(s) ? '<span class="type-badge">Archived</span>' : ''}
         </div>
         <div class="loc">${escapeHtml(s.location || 'Untitled site')}</div>
         <div class="when">${fmtDate(s.date)}${s.startTime || s.endTime ? ' &middot; ' + fmtTimeRange(s.startTime, s.endTime) : ''}</div>
@@ -199,20 +205,53 @@ function wirePhotosSection(wrap, shoot) {
   });
 
   uploadBtn.addEventListener('click', async () => {
-    if (!fileInput.files.length) return;
+    const files = [...fileInput.files];
+    if (!files.length) return;
     uploadBtn.disabled = true;
-    uploadBtn.textContent = 'Uploading...';
-    statusEl.textContent = '';
     statusEl.className = 'status-msg';
     try {
-      const formData = new FormData();
-      for (const file of fileInput.files) formData.append('photos', file);
-      const result = await apiUpload(`/api/shoots/${shoot.id}/photos`, formData);
-      if (result.dropboxFolderShareUrl) {
-        shoot.dropboxShareUrl = result.dropboxFolderShareUrl;
+      // Prep once per batch: ensures the Dropbox folder exists and hands
+      // back a short-lived token the browser uploads directly with — the
+      // file bytes never pass through our server, so there's no Vercel
+      // request-body size limit to hit.
+      uploadBtn.textContent = 'Preparing...';
+      const prep = await api(`/api/shoots/${shoot.id}/photos/prepare-upload`, { method: 'POST' });
+      if (prep.dropboxFolderShareUrl) {
+        shoot.dropboxShareUrl = prep.dropboxFolderShareUrl;
         dropboxLinkEl.innerHTML = `<a href="${shoot.dropboxShareUrl}" target="_blank" rel="noopener">Open Dropbox folder</a>`;
       }
+
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        uploadBtn.textContent = `Uploading ${i + 1}/${files.length}...`;
+        const dropboxPath = `${prep.folderPath}/${file.name}`;
+
+        const uploadRes = await fetch('https://content.dropboxapi.com/2/files/upload', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${prep.accessToken}`,
+            'Content-Type': 'application/octet-stream',
+            'Dropbox-API-Arg': JSON.stringify({ path: dropboxPath, mode: 'add', autorename: true, mute: true }),
+          },
+          body: file,
+        });
+        const uploaded = await uploadRes.json();
+        if (!uploadRes.ok) throw new Error(uploaded.error_summary || `Dropbox upload failed for ${file.name}`);
+
+        await api(`/api/shoots/${shoot.id}/photos/complete-upload`, {
+          method: 'POST',
+          body: JSON.stringify({
+            dropboxPath: uploaded.path_display,
+            filename: uploaded.name,
+            contentType: file.type,
+            sizeBytes: file.size,
+            dropboxShareUrl: shoot.dropboxShareUrl,
+          }),
+        });
+      }
+
       fileInput.value = '';
+      statusEl.textContent = '';
       await loadPhotos();
     } catch (err) {
       statusEl.textContent = err.message;
@@ -308,6 +347,12 @@ filtersEl.addEventListener('click', (e) => {
   state.filter = btn.dataset.filter;
   filtersEl.querySelectorAll('button').forEach((b) => b.classList.toggle('active', b === btn));
   render();
+});
+
+el('show-archived').addEventListener('change', (e) => {
+  state.showArchived = e.target.checked;
+  render();
+  updateMap();
 });
 
 // --- Connecteam import ---
@@ -589,7 +634,7 @@ function updateMap() {
   mapMarkers.forEach((m) => m.remove());
   mapMarkers = [];
 
-  const shootPoints = state.shoots
+  const shootPoints = visibleShoots()
     .filter((s) => typeof s.lat === 'number' && typeof s.lng === 'number')
     .map((s) => ({
       lat: s.lat,
@@ -614,7 +659,7 @@ function updateMap() {
 
   const points = [...shootPoints, ...importPoints];
   if (!points.length) {
-    mapStatus.textContent = state.shoots.length || state.importShifts.length ? 'No locations geocoded yet.' : '';
+    mapStatus.textContent = visibleShoots().length || state.importShifts.length ? 'No locations geocoded yet.' : '';
     return;
   }
   mapStatus.textContent = '';
