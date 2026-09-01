@@ -2,6 +2,7 @@ const { waitUntil } = require('@vercel/functions');
 const { requireAuth } = require('../../../lib/auth');
 const connecteam = require('../../../lib/connecteam');
 const mapbox = require('../../../lib/mapbox');
+const { dismissedJobKeys, dismissKeyFor } = require('../../../lib/supabase');
 
 module.exports = requireAuth(async (req, res) => {
   if (req.method !== 'GET') {
@@ -29,7 +30,10 @@ module.exports = requireAuth(async (req, res) => {
     const { shifts, refresh: refreshShifts } = await connecteam.fetchShiftsCached(startTime, endTime);
     if (refreshShifts) waitUntil(refreshShifts());
 
-    const filtered = shifts.filter((s) => !connecteam.NON_JOB_TITLE.test(s.title || ''));
+    const dismissed = await dismissedJobKeys().catch(() => new Set());
+    const filtered = shifts.filter(
+      (s) => !connecteam.NON_JOB_TITLE.test(s.title || '') && !dismissed.has(dismissKeyFor(s.title)),
+    );
     const collapsed = connecteam
       .collapseToOnePerJob(filtered, now)
       .sort((a, b) => (a.startTime ?? Infinity) - (b.startTime ?? Infinity));

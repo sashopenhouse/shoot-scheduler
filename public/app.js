@@ -328,6 +328,7 @@ async function loadConnecteamShifts() {
       if (crew) metaBits.push(`Crew: ${crew}`);
       if (attachCount) metaBits.push(`${attachCount} attachment${attachCount > 1 ? 's' : ''}`);
       row.dataset.shiftId = shift.shiftId;
+      row.dataset.title = shift.title || '';
       row.innerHTML = `
         <div style="flex:1;">
           <div><strong>${escapeHtml(shift.title || shift.jobTitle || 'Untitled shift')}</strong></div>
@@ -335,7 +336,10 @@ async function loadConnecteamShifts() {
           ${shift.details ? `<div class="meta" style="margin-top:3px; white-space:pre-wrap;">${escapeHtml(shift.details)}</div>` : ''}
           ${shift.progress ? jobProgressHtml(shift.progress, { showRefresh: false }) : ''}
         </div>
-        <button type="button" class="ghost" data-action="schedule">Schedule</button>
+        <div style="display:flex; flex-direction:column; gap:6px; align-items:flex-end;">
+          <button type="button" class="ghost" data-action="schedule">Schedule</button>
+          <button type="button" class="danger" data-action="remove-job">Remove</button>
+        </div>
       `;
       importList.appendChild(row);
     }
@@ -369,12 +373,43 @@ async function scheduleShift(shiftId, btn) {
   }
 }
 
+/** Permanently hides a Connecteam job (by title) from the Jobs list and map. */
+async function dismissJobByTitle(title, btn) {
+  if (!confirm(`Remove "${title}" from the Jobs list and map? This won't affect Connecteam — it'll just stop showing up here.`)) {
+    return false;
+  }
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = 'Removing...';
+  }
+  try {
+    await api('/api/jobs/dismissed', { method: 'POST', body: JSON.stringify({ title }) });
+    state.importShifts = state.importShifts.filter((s) => s.title !== title);
+    updateMap();
+    return true;
+  } catch (err) {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = 'Remove';
+    }
+    alert(err.message);
+    return false;
+  }
+}
+
 importList.addEventListener('click', async (ev) => {
-  const btn = ev.target.closest('button[data-action="schedule"]');
-  if (!btn) return;
-  const row = btn.closest('.import-row');
-  const scheduled = await scheduleShift(row.dataset.shiftId, btn);
-  if (scheduled) row.remove();
+  const scheduleBtn = ev.target.closest('button[data-action="schedule"]');
+  const removeBtn = ev.target.closest('button[data-action="remove-job"]');
+  if (!scheduleBtn && !removeBtn) return;
+  const row = (scheduleBtn || removeBtn).closest('.import-row');
+
+  if (scheduleBtn) {
+    const scheduled = await scheduleShift(row.dataset.shiftId, scheduleBtn);
+    if (scheduled) row.remove();
+  } else {
+    const removed = await dismissJobByTitle(row.dataset.title, removeBtn);
+    if (removed) row.remove();
+  }
 });
 
 loadShoots().catch((err) => {
@@ -505,16 +540,29 @@ function importPopupContent(shift, popup) {
     ${shift.progress ? jobProgressHtml(shift.progress, { showRefresh: false }) : ''}
   `);
 
-  const btn = document.createElement('button');
-  btn.type = 'button';
-  btn.className = 'ghost';
-  btn.textContent = 'Schedule';
-  btn.style.marginTop = '8px';
-  btn.addEventListener('click', async () => {
-    const scheduled = await scheduleShift(shift.shiftId, btn);
+  const actions = document.createElement('div');
+  actions.style.cssText = 'display:flex; gap:8px; margin-top:8px;';
+
+  const scheduleBtn = document.createElement('button');
+  scheduleBtn.type = 'button';
+  scheduleBtn.className = 'ghost';
+  scheduleBtn.textContent = 'Schedule';
+  scheduleBtn.addEventListener('click', async () => {
+    const scheduled = await scheduleShift(shift.shiftId, scheduleBtn);
     if (scheduled) popup.remove();
   });
-  wrap.appendChild(btn);
+
+  const removeBtn = document.createElement('button');
+  removeBtn.type = 'button';
+  removeBtn.className = 'danger';
+  removeBtn.textContent = 'Remove';
+  removeBtn.addEventListener('click', async () => {
+    const removed = await dismissJobByTitle(shift.title, removeBtn);
+    if (removed) popup.remove();
+  });
+
+  actions.append(scheduleBtn, removeBtn);
+  wrap.appendChild(actions);
   return wrap;
 }
 
