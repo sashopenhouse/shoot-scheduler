@@ -57,6 +57,7 @@ module.exports = requireAuth(async (req, res) => {
         progress: progressByTitle.get((s.title || '').trim().toLowerCase()) || null,
         lat: point?.lat ?? null,
         lng: point?.lng ?? null,
+        guessedProjectType: connecteam.guessProjectType(s.title, s.jobTitle, s.details),
       };
     });
 

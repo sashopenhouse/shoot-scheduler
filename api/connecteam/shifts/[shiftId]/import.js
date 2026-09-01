@@ -56,6 +56,7 @@ module.exports = requireAuth(async (req, res) => {
       endTime: end.time,
       status: 'planned',
       notes: noteParts.join('\n\n'),
+      projectType: connecteam.guessProjectType(shift.title, shift.jobTitle, shift.details),
       connecteamShiftId: shift.shiftId,
       connecteamJobTitle: shift.jobTitle,
       connecteamShiftTitle: shift.title,

@@ -129,6 +129,16 @@
   .badge.confirmed { background: var(--confirmed); }
   .badge.completed { background: var(--completed); }
 
+  .type-badge {
+    display: inline-block;
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 3px 9px;
+    border: 1px solid var(--slate);
+    color: var(--slate);
+    width: fit-content;
+  }
+
   .checklist { display: flex; gap: 14px; margin-top: 6px; }
   .checklist label { display: flex; align-items: center; gap: 5px; font-size: 0.82rem; color: var(--muted); cursor: pointer; }
   .checklist input { width: auto; }
@@ -250,6 +260,17 @@
             <option value="planned">Planned</option>
             <option value="confirmed">Confirmed</option>
             <option value="completed">Completed</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="f-project-type">Project type</label>
+          <select id="f-project-type">
+            <option value="">Not set</option>
+            <option value="windows">Windows</option>
+            <option value="bathroom">Bathroom</option>
+            <option value="doors">Doors</option>
+            <option value="siding">Siding</option>
+            <option value="other">Other</option>
           </select>
         </div>
       </div>

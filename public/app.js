@@ -74,7 +74,10 @@ function render() {
 
     wrap.innerHTML = `
       <div class="main">
-        <button type="button" class="badge ${s.status}" data-action="cycle-status" title="Click to advance status">${s.status}</button>
+        <div style="display:flex; gap:6px; flex-wrap:wrap;">
+          <button type="button" class="badge ${s.status}" data-action="cycle-status" title="Click to advance status">${s.status}</button>
+          ${s.projectType ? `<span class="type-badge">${escapeHtml(projectTypeLabel(s.projectType))}</span>` : ''}
+        </div>
         <div class="loc">${escapeHtml(s.location || 'Untitled site')}</div>
         <div class="when">${fmtDate(s.date)}${s.startTime || s.endTime ? ' &middot; ' + fmtTimeRange(s.startTime, s.endTime) : ''}</div>
         <div class="checklist">${checklistHtml}</div>
@@ -240,10 +243,16 @@ function escapeHtml(str) {
   return d.innerHTML;
 }
 
+const PROJECT_TYPE_LABELS = { windows: 'Windows', bathroom: 'Bathroom', doors: 'Doors', siding: 'Siding', other: 'Other' };
+function projectTypeLabel(type) {
+  return PROJECT_TYPE_LABELS[type] || type;
+}
+
 function startEdit(shoot) {
   el('shoot-id').value = shoot.id;
   el('f-location').value = shoot.location || '';
   el('f-status').value = shoot.status || 'planned';
+  el('f-project-type').value = shoot.projectType || '';
   el('f-date').value = shoot.date || '';
   el('f-start').value = shoot.startTime || '';
   el('f-end').value = shoot.endTime || '';
@@ -271,6 +280,7 @@ form.addEventListener('submit', async (e) => {
   const payload = {
     location: el('f-location').value.trim(),
     status: el('f-status').value,
+    projectType: el('f-project-type').value || null,
     date: el('f-date').value,
     startTime: el('f-start').value,
     endTime: el('f-end').value,
@@ -331,7 +341,10 @@ async function loadConnecteamShifts() {
       row.dataset.title = shift.title || '';
       row.innerHTML = `
         <div style="flex:1;">
-          <div><strong>${escapeHtml(shift.title || shift.jobTitle || 'Untitled shift')}</strong></div>
+          <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+            <strong>${escapeHtml(shift.title || shift.jobTitle || 'Untitled shift')}</strong>
+            ${shift.guessedProjectType ? `<span class="type-badge" title="Best-effort guess from job notes">${escapeHtml(projectTypeLabel(shift.guessedProjectType))}</span>` : ''}
+          </div>
           <div class="meta">${metaBits.map(escapeHtml).join(' &middot; ')}</div>
           ${shift.details ? `<div class="meta" style="margin-top:3px; white-space:pre-wrap;">${escapeHtml(shift.details)}</div>` : ''}
           ${shift.progress ? jobProgressHtml(shift.progress, { showRefresh: false }) : ''}
@@ -523,6 +536,7 @@ function shootPopupContent(s) {
   const when = `${fmtDate(s.date)}${s.startTime || s.endTime ? ' · ' + fmtTimeRange(s.startTime, s.endTime) : ''}`;
   return popupWrap(`
     <strong>${escapeHtml(s.location || 'Untitled site')}</strong>
+    ${s.projectType ? `<div>${escapeHtml(projectTypeLabel(s.projectType))}</div>` : ''}
     <div>${escapeHtml(when)}</div>
     <div style="text-transform:capitalize; color:var(--muted); margin-top:2px;">${escapeHtml(s.status)}</div>
   `);
@@ -533,6 +547,7 @@ function importPopupContent(shift, popup) {
   const crew = shift.crew?.length ? shift.crew.join(', ') : null;
   const wrap = popupWrap(`
     <strong>${escapeHtml(shift.title || shift.jobTitle || 'Untitled shift')}</strong>
+    ${shift.guessedProjectType ? `<div>${escapeHtml(projectTypeLabel(shift.guessedProjectType))}</div>` : ''}
     <div>${escapeHtml(shift.location?.address || 'No address on shift')}</div>
     <div>${escapeHtml(when)}</div>
     ${crew ? `<div>Crew: ${escapeHtml(crew)}</div>` : ''}
