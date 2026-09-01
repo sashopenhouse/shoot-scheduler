@@ -348,23 +348,33 @@ async function loadConnecteamShifts() {
 el('load-shifts').addEventListener('click', loadConnecteamShifts);
 loadConnecteamShifts();
 
-importList.addEventListener('click', async (ev) => {
-  const btn = ev.target.closest('button[data-action="schedule"]');
-  if (!btn) return;
-  const row = btn.closest('.import-row');
-  const shiftId = row.dataset.shiftId;
-  btn.disabled = true;
-  btn.textContent = 'Scheduling...';
+/** Imports a Connecteam shift as a shoot day, updating shared state either way. */
+async function scheduleShift(shiftId, btn) {
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = 'Scheduling...';
+  }
   try {
     await api(`/api/connecteam/shifts/${encodeURIComponent(shiftId)}/import?days=30`, { method: 'POST' });
     state.importShifts = state.importShifts.filter((s) => s.shiftId !== shiftId);
     await loadShoots();
-    row.remove();
+    return true;
   } catch (err) {
-    btn.disabled = false;
-    btn.textContent = 'Schedule';
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = 'Schedule';
+    }
     alert(err.message);
+    return false;
   }
+}
+
+importList.addEventListener('click', async (ev) => {
+  const btn = ev.target.closest('button[data-action="schedule"]');
+  if (!btn) return;
+  const row = btn.closest('.import-row');
+  const scheduled = await scheduleShift(row.dataset.shiftId, btn);
+  if (scheduled) row.remove();
 });
 
 loadShoots().catch((err) => {
@@ -467,6 +477,47 @@ async function initMap() {
   }
 }
 
+function popupWrap(innerHtml) {
+  const wrap = document.createElement('div');
+  wrap.style.maxWidth = '240px';
+  wrap.innerHTML = innerHtml;
+  return wrap;
+}
+
+function shootPopupContent(s) {
+  const when = `${fmtDate(s.date)}${s.startTime || s.endTime ? ' · ' + fmtTimeRange(s.startTime, s.endTime) : ''}`;
+  return popupWrap(`
+    <strong>${escapeHtml(s.location || 'Untitled site')}</strong>
+    <div>${escapeHtml(when)}</div>
+    <div style="text-transform:capitalize; color:var(--muted); margin-top:2px;">${escapeHtml(s.status)}</div>
+  `);
+}
+
+function importPopupContent(shift, popup) {
+  const when = shift.startTime ? new Date(shift.startTime * 1000).toLocaleString() : 'No time set';
+  const crew = shift.crew?.length ? shift.crew.join(', ') : null;
+  const wrap = popupWrap(`
+    <strong>${escapeHtml(shift.title || shift.jobTitle || 'Untitled shift')}</strong>
+    <div>${escapeHtml(shift.location?.address || 'No address on shift')}</div>
+    <div>${escapeHtml(when)}</div>
+    ${crew ? `<div>Crew: ${escapeHtml(crew)}</div>` : ''}
+    ${shift.details ? `<div style="margin-top:4px; white-space:pre-wrap;">${escapeHtml(shift.details)}</div>` : ''}
+    ${shift.progress ? jobProgressHtml(shift.progress, { showRefresh: false }) : ''}
+  `);
+
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'ghost';
+  btn.textContent = 'Schedule';
+  btn.style.marginTop = '8px';
+  btn.addEventListener('click', async () => {
+    const scheduled = await scheduleShift(shift.shiftId, btn);
+    if (scheduled) popup.remove();
+  });
+  wrap.appendChild(btn);
+  return wrap;
+}
+
 function updateMap() {
   if (!map) return;
 
@@ -478,23 +529,22 @@ function updateMap() {
     .map((s) => ({
       lat: s.lat,
       lng: s.lng,
-      title: s.location,
-      subtitle: fmtDate(s.date),
       pinClass: s.status,
       onClick: () => highlightShootCard(s.id),
+      buildContent: () => shootPopupContent(s),
     }));
 
   // Import candidates aren't saved shoots yet, so they don't have a card to
-  // scroll to — the popup is the only detail available for them.
+  // scroll to — the popup is the only detail available for them, plus a
+  // Schedule button so a job can be turned into a shoot right from the pin.
   const importPoints = state.importShifts
     .filter((s) => typeof s.lat === 'number' && typeof s.lng === 'number')
     .map((s) => ({
       lat: s.lat,
       lng: s.lng,
-      title: s.title || s.jobTitle || 'Untitled shift',
-      subtitle: s.startTime ? new Date(s.startTime * 1000).toLocaleDateString() : 'Not yet scheduled',
       pinClass: 'import-candidate',
       onClick: null,
+      buildContent: (popup) => importPopupContent(s, popup),
     }));
 
   const points = [...shootPoints, ...importPoints];
@@ -509,9 +559,8 @@ function updateMap() {
     const el2 = document.createElement('div');
     el2.className = `map-pin ${p.pinClass}`;
 
-    const popup = new mapboxgl.Popup({ offset: 18 }).setHTML(
-      `<strong>${escapeHtml(p.title || 'Untitled site')}</strong>${escapeHtml(p.subtitle)}`,
-    );
+    const popup = new mapboxgl.Popup({ offset: 18 });
+    popup.setDOMContent(p.buildContent(popup));
 
     const marker = new mapboxgl.Marker(el2).setLngLat([p.lng, p.lat]).setPopup(popup).addTo(map);
     if (p.onClick) el2.addEventListener('click', p.onClick);
