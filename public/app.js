@@ -336,9 +336,9 @@ async function loadConnecteamShifts() {
           ${shift.details ? `<div class="meta" style="margin-top:3px; white-space:pre-wrap;">${escapeHtml(shift.details)}</div>` : ''}
           ${shift.progress ? jobProgressHtml(shift.progress, { showRefresh: false }) : ''}
         </div>
-        <div style="display:flex; flex-direction:column; gap:6px; align-items:flex-end;">
-          <button type="button" class="ghost" data-action="schedule">Schedule</button>
-          <button type="button" class="danger" data-action="remove-job">Remove</button>
+        <div style="display:flex; flex-direction:column; gap:6px; align-items:stretch;">
+          <button type="button" class="ghost" style="width:90px;" data-action="schedule">Schedule</button>
+          <button type="button" class="danger" style="width:90px;" data-action="remove-job">Remove</button>
         </div>
       `;
       importList.appendChild(row);
@@ -546,6 +546,7 @@ function importPopupContent(shift, popup) {
   const scheduleBtn = document.createElement('button');
   scheduleBtn.type = 'button';
   scheduleBtn.className = 'ghost';
+  scheduleBtn.style.width = '90px';
   scheduleBtn.textContent = 'Schedule';
   scheduleBtn.addEventListener('click', async () => {
     const scheduled = await scheduleShift(shift.shiftId, scheduleBtn);
@@ -555,6 +556,7 @@ function importPopupContent(shift, popup) {
   const removeBtn = document.createElement('button');
   removeBtn.type = 'button';
   removeBtn.className = 'danger';
+  removeBtn.style.width = '90px';
   removeBtn.textContent = 'Remove';
   removeBtn.addEventListener('click', async () => {
     const removed = await dismissJobByTitle(shift.title, removeBtn);
