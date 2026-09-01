@@ -201,7 +201,54 @@
 
 <main>
   <section class="card">
-    <h2 id="form-title">New shoot day</h2>
+    <div class="toolbar">
+      <h2 style="margin:0;">Jobs</h2>
+      <button type="button" class="ghost" id="load-shifts">Refresh</button>
+    </div>
+    <div id="import-status" class="status-msg"></div>
+    <div id="import-list" class="import-list"></div>
+  </section>
+
+  <section class="card">
+    <h2>Search photos</h2>
+    <div class="search-panel">
+      <input type="text" id="search-q" placeholder="Search location or notes..." style="flex: 2;" />
+      <input type="date" id="search-from" title="From date" />
+      <input type="date" id="search-to" title="To date" />
+      <button type="button" id="search-btn">Search</button>
+      <button type="button" class="ghost" id="search-clear">Clear</button>
+    </div>
+    <div id="search-status" class="status-msg"></div>
+    <div class="search-results" id="search-results"></div>
+  </section>
+
+  <section class="card">
+    <h2 style="margin:0 0 12px;">Shoot map</h2>
+    <div id="shoot-map"></div>
+    <div class="status-msg" style="display:flex; gap:16px; margin-top:8px;">
+      <span><span class="legend-swatch" style="background:var(--planned);"></span> Planned</span>
+      <span><span class="legend-swatch" style="background:var(--confirmed);"></span> Confirmed</span>
+      <span><span class="legend-swatch" style="background:var(--completed);"></span> Completed</span>
+      <span><span class="legend-swatch" style="background:var(--white); border:1px solid var(--slate);"></span> Not yet scheduled</span>
+    </div>
+    <div id="map-status" class="status-msg"></div>
+  </section>
+
+  <section class="card">
+    <div class="toolbar">
+      <h2 style="margin:0;">Shoot days</h2>
+      <div class="filters" id="filters">
+        <button data-filter="all" class="active">All</button>
+        <button data-filter="planned">Planned</button>
+        <button data-filter="confirmed">Confirmed</button>
+        <button data-filter="completed">Completed</button>
+      </div>
+    </div>
+    <div class="shoot-list" id="shoot-list"></div>
+  </section>
+
+  <section class="card">
+    <h2 id="form-title">Schedule a custom shoot</h2>
     <form id="shoot-form">
       <input type="hidden" id="shoot-id" />
       <div class="row">
@@ -253,53 +300,6 @@
         <button type="button" class="secondary" id="cancel-edit" style="display:none;">Cancel edit</button>
       </div>
     </form>
-  </section>
-
-  <section class="card">
-    <div class="toolbar">
-      <h2 style="margin:0;">Connecteam import</h2>
-      <button type="button" class="ghost" id="load-shifts">Refresh</button>
-    </div>
-    <div id="import-status" class="status-msg"></div>
-    <div id="import-list" class="import-list"></div>
-  </section>
-
-  <section class="card">
-    <h2>Search photos</h2>
-    <div class="search-panel">
-      <input type="text" id="search-q" placeholder="Search location or notes..." style="flex: 2;" />
-      <input type="date" id="search-from" title="From date" />
-      <input type="date" id="search-to" title="To date" />
-      <button type="button" id="search-btn">Search</button>
-      <button type="button" class="ghost" id="search-clear">Clear</button>
-    </div>
-    <div id="search-status" class="status-msg"></div>
-    <div class="search-results" id="search-results"></div>
-  </section>
-
-  <section class="card">
-    <h2 style="margin:0 0 12px;">Shoot map</h2>
-    <div id="shoot-map"></div>
-    <div class="status-msg" style="display:flex; gap:16px; margin-top:8px;">
-      <span><span class="legend-swatch" style="background:var(--planned);"></span> Planned</span>
-      <span><span class="legend-swatch" style="background:var(--confirmed);"></span> Confirmed</span>
-      <span><span class="legend-swatch" style="background:var(--completed);"></span> Completed</span>
-      <span><span class="legend-swatch" style="background:var(--white); border:1px solid var(--slate);"></span> Not yet scheduled</span>
-    </div>
-    <div id="map-status" class="status-msg"></div>
-  </section>
-
-  <section class="card">
-    <div class="toolbar">
-      <h2 style="margin:0;">Shoot days</h2>
-      <div class="filters" id="filters">
-        <button data-filter="all" class="active">All</button>
-        <button data-filter="planned">Planned</button>
-        <button data-filter="confirmed">Confirmed</button>
-        <button data-filter="completed">Completed</button>
-      </div>
-    </div>
-    <div class="shoot-list" id="shoot-list"></div>
   </section>
 </main>
 

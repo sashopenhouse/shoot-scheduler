@@ -254,13 +254,13 @@ function startEdit(shoot) {
   el('form-title').textContent = 'Edit shoot day';
   el('submit-btn').textContent = 'Save changes';
   el('cancel-edit').style.display = 'inline-block';
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  form.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 function resetForm() {
   form.reset();
   el('shoot-id').value = '';
-  el('form-title').textContent = 'New shoot day';
+  el('form-title').textContent = 'Schedule a custom shoot';
   el('submit-btn').textContent = 'Add shoot day';
   el('cancel-edit').style.display = 'none';
 }
